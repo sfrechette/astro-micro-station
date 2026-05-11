@@ -8,6 +8,11 @@ Tracks the sun, moon, and light conditions — sunrise, sunset, golden hour, blu
 ![Platform](https://img.shields.io/badge/Platform-PlatformIO-orange)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
+![screen1](docs/images/astro_01.JPEG)
+![screen1](docs/images/astro_02.JPEG)
+![screen1](docs/images/astro_03.JPEG)
+![screen1](docs/images/astro_04.JPEG)
+
 ---
 
 ## Screens
@@ -31,14 +36,50 @@ Every screen shares a common status bar at the bottom:
 
 ---
 
-## First Flash
+## Hardware
 
-### 1. Install PlatformIO
+| Component | Detail |
+| --------- | ------ |
+| Board | [LilyGO T-Display S3 Pro](https://lilygo.cc/en-us/products/t-display-s3-pro?variant=43111690141877)|
+| MCU | ESP32-S3R8, 240 MHz dual-core LX7 |
+| Display | 2.33" IPS TFT, 480×222, ST7796, SPI |
+| Touch | CST226SE capacitive (I2C) |
+| Light / Proximity | LTR-553ALS-01 (I2C, shared bus) |
+| Flash | 16 MB (6 MB app + 8 MB LittleFS) |
+| PSRAM | 8 MB OPI (Octal) |
+| Battery | Built-in 3.8 V 470 mAh + SY6970 PMIC |
+| Connectivity | WiFi 802.11 b/g/n |
+
+### GPIO Pin Map
+
+| Function | Pin |
+| -------- | --- |
+| Display MOSI | 17 |
+| Display SCLK | 18 |
+| Display MISO | 8 |
+| Display CS | 39 |
+| Display DC | 9 |
+| Display RST | 47 |
+| Backlight PWM | 48 |
+| I2C SDA (touch + sensor) | 5 |
+| I2C SCL (touch + sensor) | 6 |
+| Touch RST | 13 |
+| Touch IRQ | 21 |
+| Brightness UP button | 16 (active LOW) |
+| Brightness DOWN button | 12 (active LOW) |
+
+---
+
+## Quick Start
+
+### 1. Clone the repo
 
 ```bash
-pip install platformio
-# or use the PlatformIO extension in VSCode / Cursor
+git clone https://github.com/stephanef/astro-micro-station.git
+cd astro-micro-station
 ```
+
+Open the folder in VSCode with the PlatformIO extension installed — dependencies are resolved automatically on first build.
 
 ### 2. Configure secrets
 
@@ -276,3 +317,7 @@ Source files are in `assets/moon-phases/`. The script renders each SVG to 155×1
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Support
+
+- **Issues**: [GitHub Issues](https://github.com/sfrechette/astro-micro-station/issues)
