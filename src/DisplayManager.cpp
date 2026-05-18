@@ -13,6 +13,15 @@ static String trimFloat(float v) {
     return s;
 }
 
+static String formatKm(float km) {
+    long rounded = lroundf(km);
+    String s = String(rounded);
+    for (int i = s.length() - 3; i > 0; i -= 3) {
+        s = s.substring(0, i) + "," + s.substring(i);
+    }
+    return s + " km";
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 //  DisplayManager.cpp  –  All screen rendering and touch input
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -305,7 +314,7 @@ void DisplayManager::drawMoon(const AstroData& a) {
         { "PHASE",    moonPhaseName(a.moonPhase),                     Pal::CARD_VAL },
         { "MOONRISE", a.moonrise,                                     Pal::CARD_VAL },
         { "ALTITUDE", trimFloat(a.moonAltitude) + "\xb0",            Pal::CARD_VAL },
-        { "DISTANCE", String(a.moonDistance / 1000.0f, 0) + "k km", Pal::CARD_LBL },
+        { "DISTANCE", formatKm(a.moonDistance),                       Pal::CARD_LBL },
     };
     struct { const char* label; String val; uint16_t col; } right[] = {
         { "ILLUMINATION", String((int)round(a.moonIllumination)) + "%", Pal::WHITE    },
