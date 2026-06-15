@@ -3,6 +3,10 @@
 #include "moon_icons.h"
 #include <math.h>
 
+namespace {
+constexpr uint8_t BACKLIGHT_LEDC_CHANNEL = 0;
+}
+
 // Render a float with up to 6 decimal places, trailing zeros stripped
 static String trimFloat(float v) {
     String s = String(v, 6);
@@ -54,7 +58,8 @@ void DisplayManager::begin() {
     tft.fillScreen(Pal::BG);
     tft.setSwapBytes(true);
 
-    ledcAttach(TFT_BL, 5000, 8);
+    ledcSetup(BACKLIGHT_LEDC_CHANNEL, 5000, 8);
+    ledcAttachPin(TFT_BL, BACKLIGHT_LEDC_CHANNEL);
     setBacklight(BACKLIGHT_NORMAL);
 
     sprite.setColorDepth(16);
@@ -70,7 +75,7 @@ void DisplayManager::begin() {
 // ─── setBacklight ─────────────────────────────────────────────────────────────
 
 void DisplayManager::setBacklight(uint8_t brightness) {
-    ledcWrite(TFT_BL, brightness);
+    ledcWrite(BACKLIGHT_LEDC_CHANNEL, brightness);
 }
 
 // ─── setRedMode ───────────────────────────────────────────────────────────────
@@ -129,7 +134,9 @@ void DisplayManager::drawPageHeader(const char* title, const AstroData& a) {
     sprite.fillRect(0, 0, DISP_W, 26, redMode ? 0x2000 : 0x0041);
     sprite.drawLine(0, 26, DISP_W, 26, redMode ? Pal::R_DIM : 0x4208);
 
-    // Icon — drawn in original colours normally, tinted R_TEXT in red mode
+    uint16_t appCol  = redMode ? Pal::R_TEXT : Pal::DKGREEN;
+
+    // Icon — tint to the same accent colour as the app title
     const int iconSize = HEADER_ICON_SIZE;
     const int iconX    = 4;
     const int iconY    = (26 - iconSize) / 2;
@@ -139,36 +146,25 @@ void DisplayManager::drawPageHeader(const char* title, const AstroData& a) {
             for (int col = 0; col < iconSize; col++) {
                 uint16_t c = pgm_read_word(src++);
                 if (c != 0xFFFF)
-                    sprite.drawPixel(iconX + col, iconY + row, redMode ? Pal::R_TEXT : c);
+                    sprite.drawPixel(iconX + col, iconY + row, appCol);
             }
         }
     }
     const int textX = iconX + iconSize + 4;
 
     // App name — green, pseudo-bold
-    uint16_t appCol  = redMode ? Pal::R_TEXT : Pal::DKGREEN;
     uint16_t bktCol  = redMode ? Pal::R_TEXT : Pal::CARD_LBL;
-    uint16_t pageCol = redMode ? Pal::R_TEXT : Pal::WHITE;
+    uint16_t pageCol = redMode ? Pal::R_TEXT : Pal::SILVER;
     sprite.setTextColor(appCol);
     sprite.drawString("ASTRONOMY MICRO STATION", textX, 5, 2);
     sprite.drawString("ASTRONOMY MICRO STATION", textX + 1, 5, 2);
     int appW = sprite.textWidth("ASTRONOMY MICRO STATION", 2);
 
-    // Page title — brackets green, title white, pseudo-bold
+    // Page title — white, pseudo-bold
     int px = textX + appW + 8;
-    sprite.setTextColor(bktCol);
-    sprite.drawString("[", px, 5, 2);
-    sprite.drawString("[", px + 1, 5, 2);
-    int bracketW = sprite.textWidth("[", 2);
-
     sprite.setTextColor(pageCol);
-    sprite.drawString(title, px + bracketW, 5, 2);
-    sprite.drawString(title, px + bracketW + 1, 5, 2);
-    int titleW = sprite.textWidth(title, 2);
-
-    sprite.setTextColor(bktCol);
-    sprite.drawString("]", px + bracketW + titleW, 5, 2);
-    sprite.drawString("]", px + bracketW + titleW + 1, 5, 2);
+    sprite.drawString(title, px, 5, 2);
+    sprite.drawString(title, px + 1, 5, 2);
 
     // Location right-aligned, green bold
     sprite.setTextColor(appCol);

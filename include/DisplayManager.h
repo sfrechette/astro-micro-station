@@ -33,7 +33,7 @@ namespace Pal {
     constexpr uint16_t ORANGE = 0xFC60;
     constexpr uint16_t BLUE   = 0x001F;
     constexpr uint16_t GOLD   = 0xFEA0;
-    constexpr uint16_t DKGREEN = 0x06E0; // bright green #00DC00
+    constexpr uint16_t DKGREEN = 0x5D5D; // light-medium blue #5AAAEA
     constexpr uint16_t CARD     = 0x0841; // barely-above-black card background
     constexpr uint16_t R_CARD   = 0x0800; // barely-above-black red card (night mode)
     constexpr uint16_t CARD_LBL = 0x94B2; // card label text  RGB(150,150,150)
