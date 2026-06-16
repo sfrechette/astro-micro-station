@@ -1,0 +1,19 @@
+# Ignore PlatformIO build artifacts and libraries
+.pio/**         linguist-vendored
+lib/**          linguist-vendored
+
+# Treat header files as C++ (Arduino/PlatformIO convention)
+*.h linguist-language=C++
+*.hpp linguist-language=C++
+*.ino linguist-language=C++
+
+# Explicitly tag sources too
+src/*.c         linguist-language=C++
+include/*.h     linguist-language=C++
+
+# Documentation files (excluded from language stats)
+*.md linguist-documentation
+LICENSE linguist-documentation
+include/README linguist-documentation
+lib/README linguist-documentation
+test/README linguist-documentation
