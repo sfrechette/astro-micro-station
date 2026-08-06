@@ -132,6 +132,8 @@ void setup() {
     else
         Serial.println("[LittleFS] OK");
 
+    astroAPI.begin();   // loads a web-dashboard-saved location override, if any
+
     Wire.begin(LTR553_SDA, LTR553_SCL);
 
     if (ltr553.begin(Wire, LTR553_SLAVE_ADDRESS, LTR553_SDA, LTR553_SCL)) {
@@ -202,6 +204,12 @@ void loop() {
             if (ok) mqtt.publishAstroData(astroAPI.data);
         }
         lastApiRefresh = now_ms;
+    }
+
+    // Web dashboard saved a new observer location — refetch now instead of
+    // waiting for the next periodic cycle.
+    if (webDashboardConsumeLocationChange()) {
+        fetchAstro();
     }
 
     // ── Proximity wake ────────────────────────────────────────────────────────

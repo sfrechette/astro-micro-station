@@ -8,7 +8,8 @@
 //  AstroAPI.cpp  –  ipgeolocation.io /astronomy fetch + parse
 // ═══════════════════════════════════════════════════════════════════════════════
 
-static constexpr const char* CACHE_PATH = "/astro_cache.json";
+static constexpr const char* CACHE_PATH    = "/astro_cache.json";
+static constexpr const char* LOCATION_PATH = "/location.json";
 
 // ─── Free functions ───────────────────────────────────────────────────────────
 
@@ -22,6 +23,35 @@ String moonPhaseName(const String& raw) {
     if (raw == "LAST_QUARTER")    return "Last Quarter";
     if (raw == "WANING_CRESCENT") return "Waning Crescent";
     return raw;
+}
+
+// ─── Private: abbreviateRegion ────────────────────────────────────────────────
+// ipgeolocation.io returns state_prov as a full name ("Quebec"); the header
+// needs the short form ("QC"). Falls back to the full name for anything not
+// in the table (i.e. outside Canada/US), so it degrades rather than breaks.
+
+static String abbreviateRegion(const String& full) {
+    static const struct { const char* full; const char* abbr; } TABLE[] = {
+        {"Alberta","AB"},{"British Columbia","BC"},{"Manitoba","MB"},{"New Brunswick","NB"},
+        {"Newfoundland and Labrador","NL"},{"Northwest Territories","NT"},{"Nova Scotia","NS"},
+        {"Nunavut","NU"},{"Ontario","ON"},{"Prince Edward Island","PE"},{"Quebec","QC"},
+        {"Saskatchewan","SK"},{"Yukon","YT"},
+        {"Alabama","AL"},{"Alaska","AK"},{"Arizona","AZ"},{"Arkansas","AR"},{"California","CA"},
+        {"Colorado","CO"},{"Connecticut","CT"},{"Delaware","DE"},{"Florida","FL"},{"Georgia","GA"},
+        {"Hawaii","HI"},{"Idaho","ID"},{"Illinois","IL"},{"Indiana","IN"},{"Iowa","IA"},
+        {"Kansas","KS"},{"Kentucky","KY"},{"Louisiana","LA"},{"Maine","ME"},{"Maryland","MD"},
+        {"Massachusetts","MA"},{"Michigan","MI"},{"Minnesota","MN"},{"Mississippi","MS"},
+        {"Missouri","MO"},{"Montana","MT"},{"Nebraska","NE"},{"Nevada","NV"},{"New Hampshire","NH"},
+        {"New Jersey","NJ"},{"New Mexico","NM"},{"New York","NY"},{"North Carolina","NC"},
+        {"North Dakota","ND"},{"Ohio","OH"},{"Oklahoma","OK"},{"Oregon","OR"},{"Pennsylvania","PA"},
+        {"Rhode Island","RI"},{"South Carolina","SC"},{"South Dakota","SD"},{"Tennessee","TN"},
+        {"Texas","TX"},{"Utah","UT"},{"Vermont","VT"},{"Virginia","VA"},{"Washington","WA"},
+        {"West Virginia","WV"},{"Wisconsin","WI"},{"Wyoming","WY"},{"District of Columbia","DC"},
+    };
+    for (const auto& row : TABLE) {
+        if (full.equalsIgnoreCase(row.full)) return String(row.abbr);
+    }
+    return full;
 }
 
 // ─── Private: parseTwilight ───────────────────────────────────────────────────
@@ -87,8 +117,71 @@ bool AstroAPI::parseResponse(const String& body) {
     data.moonDistance         = astro["moon_distance"]         | 0.0f;
     data.valid = true;
 
-    Serial.printf("[AstroAPI] Parsed OK — %s  illum=%.1f%%  sun=%.1f°\n",
-                  data.moonPhase.c_str(), data.moonIllumination, data.sunAltitude);
+    // Header label — derived from the API's own reverse-geocoded location,
+    // not user-entered. Only overwrite the previous value if this response
+    // actually has a city; a malformed/partial one shouldn't blank it out.
+    JsonObject loc = doc["location"].as<JsonObject>();
+    String city = loc["city"] | "";
+    if (city.length() > 0) {
+        String prov = loc["state_prov"] | "";
+        data.observerName = prov.length() > 0 ? (city + ", " + abbreviateRegion(prov)) : city;
+    }
+
+    Serial.printf("[AstroAPI] Parsed OK — %s  illum=%.1f%%  sun=%.1f°  loc=%s\n",
+                  data.moonPhase.c_str(), data.moonIllumination, data.sunAltitude,
+                  data.observerName.c_str());
+    return true;
+}
+
+// ─── Public: begin ────────────────────────────────────────────────────────────
+// Loads a persisted observer-location override, if the web dashboard has ever
+// saved one. Falls back silently to the OBSERVER_LAT/LON compiled from
+// secrets.h when no override file exists (first boot, or a fresh LittleFS).
+
+void AstroAPI::begin() {
+    if (!LittleFS.exists(LOCATION_PATH)) return;
+
+    File f = LittleFS.open(LOCATION_PATH, "r");
+    if (!f) return;
+
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, f);
+    f.close();
+    if (err) {
+        Serial.printf("[AstroAPI] Location override parse error: %s\n", err.c_str());
+        return;
+    }
+
+    float lat = doc["lat"] | OBSERVER_LAT;
+    float lon = doc["lon"] | OBSERVER_LON;
+    if (lat >= -90.0f && lat <= 90.0f && lon >= -180.0f && lon <= 180.0f) {
+        lat_ = lat;
+        lon_ = lon;
+        Serial.printf("[AstroAPI] Using saved location override: %.6f, %.6f\n", lat_, lon_);
+    }
+}
+
+// ─── Public: setLocation ──────────────────────────────────────────────────────
+// The header label (data.observerName) isn't set here — it's re-derived from
+// the API's own location block on the fetch() that follows a location change.
+
+bool AstroAPI::setLocation(float lat, float lon) {
+    if (lat < -90.0f || lat > 90.0f || lon < -180.0f || lon > 180.0f)
+        return false;
+
+    lat_ = lat;
+    lon_ = lon;
+
+    JsonDocument doc;
+    doc["lat"] = lat_;
+    doc["lon"] = lon_;
+    File f = LittleFS.open(LOCATION_PATH, "w");
+    if (!f) {
+        Serial.println("[AstroAPI] Location override write failed");
+        return false;
+    }
+    serializeJson(doc, f);
+    f.close();
     return true;
 }
 
@@ -97,8 +190,8 @@ bool AstroAPI::parseResponse(const String& body) {
 bool AstroAPI::fetch() {
     String url = "https://api.ipgeolocation.io/v2/astronomy"
                  "?apiKey=" + String(ASTRO_API_KEY) +
-                 "&lat="    + String(OBSERVER_LAT, 6) +
-                 "&long="   + String(OBSERVER_LON, 6) +
+                 "&lat="    + String(lat_, 6) +
+                 "&long="   + String(lon_, 6) +
                  "&elevation=10";
 
     Serial.println("[AstroAPI] Fetching ipgeolocation.io/v2/astronomy ...");

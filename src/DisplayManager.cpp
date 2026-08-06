@@ -169,8 +169,8 @@ void DisplayManager::drawPageHeader(const char* title, const AstroData& a) {
     // Location right-aligned, green bold
     sprite.setTextColor(appCol);
     sprite.setTextDatum(TR_DATUM);
-    sprite.drawString("Gatineau, QC", DISP_W - 10, 5, 2);
-    sprite.drawString("Gatineau, QC", DISP_W - 11, 5, 2);
+    sprite.drawString(a.observerName, DISP_W - 10, 5, 2);
+    sprite.drawString(a.observerName, DISP_W - 11, 5, 2);
     sprite.setTextDatum(TL_DATUM);
 }
 

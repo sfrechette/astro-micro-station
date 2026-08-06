@@ -156,6 +156,23 @@ static const char DASHBOARD_HTML[] PROGMEM = R"HTMLPAGE(<!DOCTYPE html>
 
   footer{ margin-top:26px; padding-top:16px; border-top:1px solid var(--panel-line); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; font-size:11px; color:var(--ink-faint); }
   @media (max-width: 520px){ footer{ flex-direction:column; align-items:flex-start; } }
+
+  .location{ margin-bottom:16px; }
+  .location-form{ display:flex; gap:14px; align-items:flex-end; flex-wrap:wrap; margin-top:12px; }
+  .loc-field{ display:flex; flex-direction:column; gap:6px; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-dim); }
+  .loc-field input{
+    font: inherit; font-family: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+    font-size:14px; color:var(--ink); background:var(--bg); border:1px solid var(--panel-line);
+    border-radius:6px; padding:8px 10px; width:150px;
+  }
+  .loc-field input:focus-visible{ outline:2px solid var(--focus); outline-offset:1px; border-color:var(--cyan); }
+  button.ghost.primary{ color:var(--bg); background:var(--green); border-color:var(--green); font-weight:700; }
+  button.ghost.primary:hover{ filter:brightness(1.1); color:var(--bg); }
+  .location-status{ margin:10px 0 0; font-size:12px; color:var(--ink-dim); min-height:1em; }
+  .location-status.ok{ color:var(--green); }
+  .location-status.err{ color:var(--amber); }
+  .location-hint{ margin:8px 0 0; font-size:11px; color:var(--ink-faint); }
+  @media (max-width: 520px){ .loc-field input{ width:130px; } }
 </style>
 </head>
 <body>
@@ -179,7 +196,7 @@ static const char DASHBOARD_HTML[] PROGMEM = R"HTMLPAGE(<!DOCTYPE html>
         <span class="toggle" tabindex="0"></span>
       </label>
       <div class="location">
-        <div class="location-name">Gatineau, QC</div>
+        <div class="location-name" id="locationName">—</div>
         <div class="location-time mono" id="dateTime">—</div>
       </div>
     </div>
@@ -241,6 +258,24 @@ static const char DASHBOARD_HTML[] PROGMEM = R"HTMLPAGE(<!DOCTYPE html>
       <span><span class="legend-swatch" style="background:var(--civil-band)"></span>Civil</span>
       <span><span class="legend-swatch" style="background:var(--day-band)"></span>Daylight</span>
     </div>
+  </section>
+
+  <section class="card location">
+    <p class="card-label">Observer location &middot; saved to the device</p>
+    <form class="location-form" id="locationForm">
+      <label class="loc-field">
+        <span>Latitude</span>
+        <input type="number" id="latInput" step="0.000001" min="-90" max="90" inputmode="decimal" required>
+      </label>
+      <label class="loc-field">
+        <span>Longitude</span>
+        <input type="number" id="lonInput" step="0.000001" min="-180" max="180" inputmode="decimal" required>
+      </label>
+      <button class="ghost" type="button" id="homeBtn">Use home location</button>
+      <button class="ghost primary" type="submit">Save &amp; refresh</button>
+    </form>
+    <p class="location-status" id="locationStatus"></p>
+    <p class="location-hint">The city/province shown top-right is looked up automatically from these coordinates — no need to type it.</p>
   </section>
 
   <section class="details">
@@ -404,6 +439,7 @@ static const char DASHBOARD_HTML[] PROGMEM = R"HTMLPAGE(<!DOCTYPE html>
 
     setText('hostLabel', 'device ' + location.host + ' · desktop view');
     setText('dateTime', (data.fetchDate || '') + ' · ' + (data.currentTime || ''));
+    if(data.locationName) setText('locationName', data.locationName);
 
     setText('moonPhaseName', moon.phaseName || moon.phase || '—');
     setText('moonIllumTop', fmtPct(moon.illumination) + ' illuminated');
@@ -488,6 +524,81 @@ static const char DASHBOARD_HTML[] PROGMEM = R"HTMLPAGE(<!DOCTYPE html>
   var btn = $('refreshBtn');
   if(btn) btn.addEventListener('click', poll);
 
+  function loadLocation(){
+    fetch('/api/location', {cache:'no-store'})
+      .then(function(r){ return r.json(); })
+      .then(function(loc){
+        var lat = $('latInput'), lon = $('lonInput');
+        if(lat && document.activeElement !== lat) lat.value = loc.lat;
+        if(lon && document.activeElement !== lon) lon.value = loc.lon;
+      })
+      .catch(function(){});
+  }
+
+  var locForm = $('locationForm');
+  if(locForm){
+    locForm.addEventListener('submit', function(e){
+      e.preventDefault();
+      var lat = parseFloat($('latInput').value);
+      var lon = parseFloat($('lonInput').value);
+      var status = $('locationStatus');
+      if(isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180){
+        status.textContent = 'Latitude must be -90..90, longitude -180..180.';
+        status.className = 'location-status err';
+        return;
+      }
+      status.textContent = 'Saving…';
+      status.className = 'location-status';
+      fetch('/api/location', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({lat: lat, lon: lon})
+      })
+        .then(function(r){ return r.json().then(function(body){ return {ok: r.ok, body: body}; }); })
+        .then(function(res){
+          if(!res.ok){
+            status.textContent = (res.body && res.body.error) || 'Save failed.';
+            status.className = 'location-status err';
+            return;
+          }
+          status.textContent = 'Saved — refreshing astronomy data for the new location…';
+          status.className = 'location-status ok';
+          poll();
+        })
+        .catch(function(){
+          status.textContent = 'Could not reach the device.';
+          status.className = 'location-status err';
+        });
+    });
+  }
+
+  var homeBtn = $('homeBtn');
+  if(homeBtn){
+    homeBtn.addEventListener('click', function(){
+      var status = $('locationStatus');
+      status.textContent = 'Setting home location…';
+      status.className = 'location-status';
+      fetch('/api/location/home', {method: 'POST'})
+        .then(function(r){ return r.json().then(function(body){ return {ok: r.ok, body: body}; }); })
+        .then(function(res){
+          if(!res.ok){
+            status.textContent = (res.body && res.body.error) || 'Failed to set home location.';
+            status.className = 'location-status err';
+            return;
+          }
+          status.textContent = 'Home location set — refreshing astronomy data…';
+          status.className = 'location-status ok';
+          loadLocation();
+          poll();
+        })
+        .catch(function(){
+          status.textContent = 'Could not reach the device.';
+          status.className = 'location-status err';
+        });
+    });
+  }
+
+  loadLocation();
   poll();
 })();
 </script>
