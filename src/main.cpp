@@ -9,6 +9,7 @@
 #include <LittleFS.h>
 #include "DisplayManager.h"
 #include "MQTTManager.h"
+#include "WebDashboard.h"
 
 // ─── LTR-553 proximity sensor ────────────────────────────────────────────────
 #include <LightSensorDrv.hpp>
@@ -161,6 +162,11 @@ void setup() {
 
     mqtt.begin();
     fetchAstro();
+
+    if (WiFi.status() == WL_CONNECTED) {
+        webDashboardBegin(&astroAPI);
+        Serial.printf("[WebDashboard] http://%s/\n", WiFi.localIP().toString().c_str());
+    }
 
     pinMode(BTN_BRIGHT_UP_PIN, INPUT_PULLUP);
     pinMode(BTN_BRIGHT_DN_PIN, INPUT_PULLUP);

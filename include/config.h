@@ -34,3 +34,6 @@
 
 // ── Proximity wake threshold (LTR-553) ───────────────────────────────────────
 #define PROX_WAKE_THRESHOLD  50             // ADC counts; tune for your hand distance
+
+// ── Web dashboard (read-only desktop/mobile view, served over WiFi) ──────────
+#define WEB_DASHBOARD_PORT   80
