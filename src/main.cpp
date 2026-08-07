@@ -2,7 +2,6 @@
 #include <WiFi.h>
 #include <NTPClient.h>
 #include <WiFiUdp.h>
-#include <time.h>
 
 #include "config.h"
 #include "AstroAPI.h"
@@ -183,7 +182,6 @@ void setup() {
 
 void loop() {
     const uint32_t now_ms = millis();
-    const time_t   now    = ntp.getEpochTime();
 
     // ── Periodic tasks ────────────────────────────────────────────────────────
     mqtt.loop();
@@ -302,7 +300,7 @@ void loop() {
                     || (wasDimmed && !display.dimmed);  // just woke up
 
     if (needsRedraw && !display.dimmed) {
-        display.drawScreen(currentScreen, astroAPI.data, now);
+        display.drawScreen(currentScreen, astroAPI.data);
         lastScreen      = currentScreen;
         lastRedMode     = display.redMode;
         lastRenderFetch = lastApiRefresh;

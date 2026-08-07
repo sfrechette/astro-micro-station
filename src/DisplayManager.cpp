@@ -87,7 +87,7 @@ void DisplayManager::setRedMode(bool on) {
 
 // ─── drawScreen ───────────────────────────────────────────────────────────────
 
-void DisplayManager::drawScreen(int screen, const AstroData& astro, time_t now) {
+void DisplayManager::drawScreen(int screen, const AstroData& astro) {
     sprite.fillSprite(bgColor());                              // header band gets bg colour
     sprite.fillRect(0, 27, DISP_W, DISP_H - 27, 0x0000);    // content area pure black
 
@@ -340,24 +340,4 @@ void DisplayManager::drawNavDots(int active) {
         else
             sprite.drawCircle(x, y, dotR, redMode ? Pal::R_DIM : 0x4208);
     }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-//  Touch FSM
-// ═══════════════════════════════════════════════════════════════════════════════
-
-int DisplayManager::processTouchEvent(uint16_t x, uint16_t y, bool down, uint32_t ms) {
-    if (down) {
-        if (!_touched) {
-            _touched      = true;
-            _touchStartMs = ms;
-        }
-    } else {
-        if (_touched) {
-            _touched = false;
-            if (ms - _touchStartMs < 600)
-                return +1;  // tap → next page
-        }
-    }
-    return 0;
 }

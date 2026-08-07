@@ -22,16 +22,11 @@ static constexpr int DISP_H = 222;
 namespace Pal {
     // Normal mode
     constexpr uint16_t BG     = 0x0841;
-    constexpr uint16_t PANEL  = 0x1082;
     constexpr uint16_t ACCENT = 0x05FF;
     constexpr uint16_t WHITE  = 0xFFFF;
     constexpr uint16_t SILVER = 0xC618; // #C0C0C0
     constexpr uint16_t GREY   = 0x8410;
-    constexpr uint16_t YELLOW = 0xFFE0;
-    constexpr uint16_t GREEN  = 0x07E0;
     constexpr uint16_t RED    = 0xF800;
-    constexpr uint16_t ORANGE = 0xFC60;
-    constexpr uint16_t BLUE   = 0x001F;
     constexpr uint16_t GOLD   = 0xFEA0;
     constexpr uint16_t DKGREEN = 0x5D5D; // light-medium blue #5AAAEA
     constexpr uint16_t CARD     = 0x0841; // barely-above-black card background
@@ -63,18 +58,9 @@ public:
     void setRedMode(bool on);
 
     // Draw the requested screen index (0=Morning, 1=Evening, 2=Day, 3=Moon) into sprite and push.
-    void drawScreen(int screen, const AstroData& astro, time_t now);
-
-    // Process a touch event. Returns: -1 prev, +1 next, 2 long-press, 0 none.
-    int processTouchEvent(uint16_t x, uint16_t y, bool down, uint32_t ms);
+    void drawScreen(int screen, const AstroData& astro);
 
 private:
-    // Touch FSM state
-    bool     _touched         = false;
-    uint32_t _touchStartMs    = 0;
-    uint16_t _touchStartX     = 0;
-    bool     _longPressHandled = false;
-
     // ── Per-screen draw methods ───────────────────────────────────────────────
     void drawMorning(const AstroData& a);
     void drawEvening(const AstroData& a);
@@ -86,8 +72,6 @@ private:
     void drawCard(int x, int y, int w, int h, const char* lbl, const String& val, uint16_t valCol, uint8_t valFont = 2);
 
     // ── Colour helpers ────────────────────────────────────────────────────────
-    uint16_t textColor()   const { return redMode ? Pal::R_TEXT : Pal::WHITE;  }
-    uint16_t dimColor()    const { return redMode ? Pal::R_DIM  : Pal::GREY;   }
     uint16_t accentColor() const { return redMode ? Pal::R_TEXT : Pal::ACCENT; }
     uint16_t bgColor()     const { return redMode ? Pal::R_BG   : Pal::BG;     }
     uint16_t cardBg()      const { return redMode ? Pal::R_CARD : Pal::CARD;   }

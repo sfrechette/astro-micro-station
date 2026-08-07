@@ -25,7 +25,6 @@
 #define BACKLIGHT_DIM        40
 #define BACKLIGHT_RED_MODE   60
 #define DIM_TIMEOUT_SEC      30             // dim after this many seconds idle
-#define SLEEP_TIMEOUT_SEC    120            // deep sleep after this (0 = never)
 
 // ── Refresh intervals ─────────────────────────────────────────────────────────
 #define API_REFRESH_INTERVAL_MS   900000UL  // re-fetch astronomy data every 15 min

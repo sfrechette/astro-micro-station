@@ -91,11 +91,10 @@ Copy `include/secrets_template.h` to `include/secrets.h` and fill in your creden
 #define WIFI_PASSWORD   "your-password"
 #define ASTRO_API_KEY   "your-key"        // free at ipgeolocation.io
 
-// Required — your coordinates
+// Required — your coordinates (can also be changed later from the web
+// dashboard, at runtime, without reflashing — see "Adjusting for Your Location")
 #define OBSERVER_LAT    43.7001f          // decimal degrees, positive = North
 #define OBSERVER_LON    -79.4163f         // decimal degrees, negative = West
-#define OBSERVER_TZ     "America/Toronto"
-#define UTC_OFFSET_SEC  -18000            // EDT = -14400  |  EST = -18000
 
 // Optional — only needed if MQTT_ENABLED is defined in config.h
 #define MQTT_BROKER     "192.168.1.x"     // your Mosquitto broker IP
@@ -126,7 +125,7 @@ If the board does not auto-enter flash mode:
 
 ### 4. First boot — LittleFS
 
-On the very first boot the LittleFS partition is blank and will be formatted automatically. You will see `[LittleFS] OK` in the monitor. From that point the last successful API response is cached at `/astro_cache.json` and loaded on any boot where WiFi is unavailable.
+On the very first boot the LittleFS partition is blank and will be formatted automatically. You will see `[LittleFS] OK` in the monitor. From that point the last successful API response is cached at `/astro_cache.json` and loaded on any boot where WiFi is unavailable. If you've ever saved a location from the [web dashboard](#web-dashboard), that override is separately persisted at `/location.json` and takes priority over the `secrets.h` default on every boot.
 
 ---
 
@@ -151,6 +150,44 @@ Long-press anywhere to toggle. In red mode:
 - Background, cards, and text shift to deep red tones
 - Moon phase image is re-rendered as red-luminance (shading preserved)
 - Backlight target drops to `BACKLIGHT_RED_MODE` (default 60/255)
+
+---
+
+## Web Dashboard
+
+A companion webpage served directly by the device over WiFi — same astronomy data as the on-device screens, laid out for a desktop or phone browser instead of a 480×222 panel. Purely additive: the on-device touch UI and screens are completely unaffected by this feature.
+
+### Accessing it
+
+Once WiFi connects, the serial monitor prints the URL:
+
+```text
+[WebDashboard] http://192.168.1.xx/
+```
+
+Open that address in any browser on the same network. Port is configurable via `WEB_DASHBOARD_PORT` in `config.h` (default `80`).
+
+### What it shows
+
+- Moon phase, illumination, sun altitude, day length, sunset — at a glance
+- A sky-position widget (live azimuth/altitude for sun and moon)
+- A light-curve timeline — night → astronomical → nautical → civil → daylight — with sunrise/solar-noon/sunset markers
+- Full sun and moon detail panels, plus morning/evening twilight breakdowns
+- A night-vision toggle mirroring the device's own red mode (page-local only — doesn't touch the physical device)
+
+The page polls `/api/astro` at the same interval the device re-fetches from ipgeolocation.io (`API_REFRESH_INTERVAL_MS`, default 15 min) — the response tells the page how often to poll, so there's one source of truth instead of a hardcoded duplicate.
+
+### Changing your location from the dashboard
+
+The **Observer location** card pushes a new latitude/longitude to the device — no reflash needed:
+
+- Enter coordinates and click **Save & refresh** — persists to `/location.json` on LittleFS (survives reboots) and triggers an immediate re-fetch for the new location
+- Click **Use home location** to reset to the coordinates compiled into `secrets.h` (`OBSERVER_LAT`/`OBSERVER_LON`) without retyping them
+- The city/province label shown top-right — on both the dashboard and the device's own header — is **not typed in anywhere**. It's resolved automatically from ipgeolocation.io's reverse-geocoded response on every fetch, so it updates itself when you travel
+
+### Remote access
+
+The dashboard is only reachable on your local network by default. For remote access (e.g. over [Tailscale](https://tailscale.com/)), run a small reverse proxy on any always-on machine that already has network access to the device — a lightweight `socat` container forwarding a Tailscale-reachable port to the device's local IP works well and needs no changes to this firmware.
 
 ---
 
@@ -212,6 +249,7 @@ Key log prefixes for diagnostics:
 | `[Nav]` | Screen change events |
 | `[MQTT] →` | Data topic published (sun / moon / morning / evening) |
 | `[MQTT] Discovery:` | Auto-discovery config published for one sensor |
+| `[WebDashboard]` | Dashboard server start URL, and location updates saved from it |
 
 Example memory line:
 
@@ -257,14 +295,22 @@ All fields are fetched from the API and replaced on **every 15-minute refresh** 
 
 ## Adjusting for Your Location
 
-In `include/secrets.h`:
+Two ways to set the observer coordinates used for every astronomy calculation:
+
+### At runtime — via the web dashboard (no reflash)
+
+Open the [web dashboard](#web-dashboard) and use the **Observer location** card. Changes persist to LittleFS and take effect immediately — no rebuild, no re-upload, no touching the device. Click **Use home location** any time to jump back to your `secrets.h` default.
+
+### At build time — via `secrets.h`
+
+The compiled-in default (used on first boot, and whenever no dashboard override has been saved):
 
 ```cpp
 #define OBSERVER_LAT    43.7001f          // decimal degrees, positive = North
 #define OBSERVER_LON    -79.4163f         // decimal degrees, negative = West
-#define OBSERVER_TZ     "America/Toronto"
-#define UTC_OFFSET_SEC  -18000            // EDT = -14400  |  EST = -18000
 ```
+
+Timezone is resolved automatically, server-side, by ipgeolocation.io from these coordinates — there's no timezone or UTC-offset setting to configure.
 
 ---
 
@@ -282,13 +328,16 @@ astro-micro-station/
 │   ├── AstroAPI.h              # ipgeolocation.io data structures + class
 │   ├── DisplayManager.h        # Colour palette, screen class declaration
 │   ├── MQTTManager.h           # HA status publisher (stub when disabled)
+│   ├── WebDashboard.h          # Web dashboard server declarations
+│   ├── dashboard_html.h        # Dashboard page (HTML/CSS/JS) as a PROGMEM string
 │   ├── icons.h                 # ICON_ASTRO — 22×22 RGB565 PROGMEM
 │   └── moon_icons.h            # 8 moon phase images — 155×155 RGB565 PROGMEM
 ├── src/
 │   ├── main.cpp                # Setup, loop, WiFi, NTP, touch FSM, brightness
-│   ├── AstroAPI.cpp            # HTTP fetch, JSON parse, LittleFS cache
+│   ├── AstroAPI.cpp            # HTTP fetch, JSON parse, LittleFS cache, location
 │   ├── DisplayManager.cpp      # All screen rendering
-│   └── MQTTManager.cpp         # MQTT connection + discovery + data publish
+│   ├── MQTTManager.cpp         # MQTT connection + discovery + data publish
+│   └── WebDashboard.cpp        # ESPAsyncWebServer routes: dashboard + JSON API
 └── assets/
     ├── moon-phases/            # Source SVGs for moon phase images (8 files)
     ├── icons/                  # Source PNG for header icon
