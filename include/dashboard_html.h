@@ -31,8 +31,6 @@ static const char DASHBOARD_HTML[] PROGMEM = R"HTMLPAGE(<!DOCTYPE html>
     --naut-band:     #0f2a38;
     --civil-band:    #164a5a;
     --day-band:      #ffb020;
-    --moon-lit:      #dfe4e8;
-    --moon-dark:     #12181c;
     --focus:         #33c7ff;
   }
   *{ box-sizing:border-box; }
@@ -57,7 +55,6 @@ static const char DASHBOARD_HTML[] PROGMEM = R"HTMLPAGE(<!DOCTYPE html>
     --green:#ff5a3c; --green-dim:#5a1f14; --cyan:#ff8a5c; --amber:#ff6a3c; --silver:#ffb89a;
     --ink:#ffd9c4; --ink-dim:#8a5a44; --ink-faint:#4a2e22;
     --panel:#170e09; --panel-line:#3a1f12; --bg:#0c0603;
-    --moon-lit:#e8bda2; --moon-dark:#1a0f09;
     --day-band:#ff6a3c; --civil-band:#5a2c14; --naut-band:#3a1a0c; --astro-band:#1e0f08; --night-band:#0a0503;
   }
   body:has(#redmode:checked){ background: radial-gradient(120% 140% at 15% -10%, #170d08 0%, var(--bg) 55%); }
@@ -107,8 +104,10 @@ static const char DASHBOARD_HTML[] PROGMEM = R"HTMLPAGE(<!DOCTYPE html>
   .card-label{ font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-dim); margin:0 0 10px; }
 
   .moon-card{ display:flex; align-items:center; gap:16px; }
-  .moon-disc{ width:64px; height:64px; border-radius:50%; flex:none; background:var(--moon-lit); box-shadow: inset 20px 0 0 0 var(--moon-dark); border: 1px solid var(--panel-line); }
-  @media (max-width: 520px){ .moon-card{ gap:12px; } .moon-disc{ width:52px; height:52px; } }
+  .moon-disc{ width:100px; height:100px; flex:none; }
+  .moon-disc svg{ display:block; width:100%; height:100%; filter: grayscale(1); }
+  body:has(#redmode:checked) .moon-disc svg{ filter: grayscale(1) sepia(1) hue-rotate(-50deg) saturate(6) brightness(.85); }
+  @media (max-width: 520px){ .moon-card{ gap:12px; } .moon-disc{ width:80px; height:80px; } }
   .moon-info .card-value{ font-size:18px; font-weight:700; color:var(--ink); margin-bottom:2px; }
   .moon-info .card-sub{ font-size:12.5px; color:var(--cyan); }
 
@@ -347,6 +346,21 @@ static const char DASHBOARD_HTML[] PROGMEM = R"HTMLPAGE(<!DOCTYPE html>
 (function(){
   var $ = function(id){ return document.getElementById(id); };
 
+  // Same 8 source icons the device renders (assets/moon-phases/*.svg),
+  // keyed by the exact phase string the API returns — same mapping as
+  // moonPhaseIndex() in include/moon_icons.h. Colour is neutralised via
+  // CSS filter (.moon-disc svg) to match the device's greyscale rendering.
+  var MOON_SVG = {
+    NEW_MOON: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="none" stroke="#e5e7eb" stroke-dasharray="16.9 56.2" stroke-linecap="round" stroke-linejoin="round" stroke-width="17.4" d="M384 256a128 128 0 00-128-128c-169.8 6.7-169.7 249.3 0 256a128 128 0 00128-128Z"/></svg>',
+    WAXING_CRESCENT: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="a" x1="211.4" x2="330.3" y1="166.7" y2="372.6" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#86c3db"/><stop offset=".5" stop-color="#86c3db"/><stop offset="1" stop-color="#5eafcf"/></linearGradient></defs><path fill="none" stroke="#e5e7eb" stroke-dasharray="16.9 56.2" stroke-linecap="round" stroke-linejoin="round" stroke-width="17.4" d="M384 256a128 128 0 00-128-128c-169.8 6.7-169.7 249.3 0 256a128 128 0 00128-128Z"/><path fill="url(#a)" stroke="#72b9d5" stroke-linecap="round" stroke-linejoin="round" stroke-width="6" d="M310.3 127.5a142.3 142.3 0 00-19-7l.7.6h0c92.2 96.7 21 256.7-112.6 252.8l-.8-.1a141.4 141.4 0 0017.8 9.5 140 140 0 10114-255.8Z"/></svg>',
+    FIRST_QUARTER: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="a" x1="193.7" x2="325.5" y1="147.7" y2="376" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#86c3db"/><stop offset=".5" stop-color="#86c3db"/><stop offset="1" stop-color="#5eafcf"/></linearGradient></defs><path fill="none" stroke="#e5e7eb" stroke-dasharray="16.9 56.2" stroke-linecap="round" stroke-linejoin="round" stroke-width="17.4" d="M384 256a128 128 0 00-128-128c-169.8 6.7-169.7 249.3 0 256a128 128 0 00128-128Z"/><path fill="url(#a)" stroke="#72b9d5" stroke-linecap="round" stroke-linejoin="round" stroke-width="6" d="M310 126.1a140.4 140.4 0 00-57-12.6 140 140 0 0126 152.1A140 140 0 01148.7 348c14 17.3 25.6 24.1 47.5 33.9 72 32 156 .8 187.4-69.8s-1.5-153.9-73.6-186Z"/></svg>',
+    WAXING_GIBBOUS: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="a" x1="193.9" x2="327.1" y1="143.9" y2="374.7" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#86c3db"/><stop offset=".5" stop-color="#86c3db"/><stop offset="1" stop-color="#5eafcf"/></linearGradient></defs><path fill="none" stroke="#e5e7eb" stroke-dasharray="16.9 56.2" stroke-linecap="round" stroke-linejoin="round" stroke-width="17.4" d="M384 256a128 128 0 00-128-128c-169.8 6.7-169.7 249.3 0 256a128 128 0 00128-128Z"/><path fill="url(#a)" stroke="#72b9d5" stroke-linecap="round" stroke-linejoin="round" stroke-width="6" d="M391.4 214.8a134.1 134.1 0 00-155.6-95.1 135.2 135.2 0 0113.8 31.9c20.7 73.2-22 151-95.4 173.8a145.4 145.4 0 01-14.8 3.6c31 52.5 94.7 78.7 156.6 59.6a142.6 142.6 0 0095.4-173.8Z"/></svg>',
+    FULL_MOON: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="a" x1="186" x2="326" y1="134.7" y2="377.3" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#86c3db"/><stop offset=".5" stop-color="#86c3db"/><stop offset="1" stop-color="#5eafcf"/></linearGradient></defs><circle cx="256" cy="256" r="140" fill="url(#a)" stroke="#72b9d5" stroke-linecap="round" stroke-linejoin="round" stroke-width="6"/></svg>',
+    WANING_GIBBOUS: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="a" x1="12993.6" x2="13126.8" y1="143.9" y2="374.7" gradientTransform="matrix(-1 0 0 1 13312.32 0)" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#86c3db"/><stop offset=".5" stop-color="#86c3db"/><stop offset="1" stop-color="#5eafcf"/></linearGradient></defs><path fill="none" stroke="#e5e7eb" stroke-dasharray="16.9 56.2" stroke-linecap="round" stroke-linejoin="round" stroke-width="17.4" d="M384 256a128 128 0 00-128-128c-169.8 6.7-169.7 249.3 0 256a128 128 0 00128-128Z"/><path fill="url(#a)" stroke="#72b9d5" stroke-linecap="round" stroke-linejoin="round" stroke-width="6" d="M121.2 214.8a134.1 134.1 0 01155.6-95.1 135.6 135.6 0 00-13.8 31.9c-20.7 73.2 22 151 95.4 173.8a145.4 145.4 0 0014.9 3.6 134.6 134.6 0 01-156.7 59.6 142.6 142.6 0 01-95.4-173.8Z"/></svg>',
+    LAST_QUARTER: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="a" x1="12482" x2="12613.8" y1="147.7" y2="376" gradientTransform="matrix(-1 0 0 1 12799.71 0)" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#86c3db"/><stop offset=".5" stop-color="#86c3db"/><stop offset="1" stop-color="#5eafcf"/></linearGradient></defs><path fill="none" stroke="#e5e7eb" stroke-dasharray="16.9 56.2" stroke-linecap="round" stroke-linejoin="round" stroke-width="17.4" d="M384 256a128 128 0 00-128-128c-169.8 6.7-169.7 249.3 0 256a128 128 0 00128-128Z"/><path fill="url(#a)" stroke="#72b9d5" stroke-linecap="round" stroke-linejoin="round" stroke-width="6" d="M201.5 126.1a140.3 140.3 0 0157-12.6 140 140 0 00-26.2 152.1A140 140 0 00363 348c-14 17.3-25.7 24.1-47.5 33.9-72.1 32-156 .8-187.5-69.8s1.5-153.9 73.6-186Z"/></svg>',
+    WANING_CRESCENT: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="a" x1="11988.7" x2="12107.6" y1="166.7" y2="372.6" gradientTransform="matrix(-1 0 0 1 12286.71 0)" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#86c3db"/><stop offset=".5" stop-color="#86c3db"/><stop offset="1" stop-color="#5eafcf"/></linearGradient></defs><path fill="none" stroke="#e5e7eb" stroke-dasharray="16.9 56.2" stroke-linecap="round" stroke-linejoin="round" stroke-width="17.4" d="M384 256a128 128 0 00-128-128c-169.8 6.7-169.7 249.3 0 256a128 128 0 00128-128Z"/><path fill="url(#a)" stroke="#72b9d5" stroke-linecap="round" stroke-linejoin="round" stroke-width="6" d="M199 127.5a142.4 142.4 0 0119.2-7l-.8.6h0c-92.2 96.7-21 256.7 112.6 252.8l.8-.1a140 140 0 11-131.7-246.3Z"/></svg>'
+  };
+
   function toMinutes(t){
     if(!t || t === '--:--' || t === '-:-') return null;
     var parts = t.split(':');
@@ -444,13 +458,7 @@ static const char DASHBOARD_HTML[] PROGMEM = R"HTMLPAGE(<!DOCTYPE html>
     setText('moonPhaseName', moon.phaseName || moon.phase || '—');
     setText('moonIllumTop', fmtPct(moon.illumination) + ' illuminated');
     var disc = $('moonDisc');
-    if(disc){
-      var illum = Math.max(0, Math.min(100, moon.illumination || 0));
-      var waxing = (moon.phase || '').indexOf('WANING') === -1;
-      var diameter = disc.offsetWidth || 64;
-      var offset = Math.round((1 - illum/100) * diameter * (waxing ? 1 : -1));
-      disc.style.boxShadow = 'inset ' + offset + 'px 0 0 0 var(--moon-dark)';
-    }
+    if(disc) disc.innerHTML = MOON_SVG[moon.phase] || MOON_SVG.NEW_MOON;
 
     setText('sunAltValue', typeof sun.altitude === 'number' ? sun.altitude.toFixed(1) : '—');
     setText('sunAltSub', 'azimuth ' + fmtDeg(sun.azimuth) + ' · ' + (sun.altitude >= 0 ? 'above horizon' : 'below horizon'));
